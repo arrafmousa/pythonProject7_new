@@ -18,7 +18,7 @@ class OptimalPirateAgent:
         for ship_name, ship_info in initial['pirate_ships'].items():
             # Here, we create a new structure for each pirate ship
             pirate_ships_state[ship_name] = {
-                'position': ship_info['location'],  # 'position' now directly holds the location
+                'location': ship_info['location'],  # 'position' now directly holds the location
                 'capacity': ship_info['capacity'],
             }
 
@@ -36,7 +36,7 @@ class OptimalPirateAgent:
     def action_per_ship(self, ship, state):
         n = len(self.map) - 1
         m = len(self.map[0]) - 1
-        ship_loc = state[0][ship]['position']
+        ship_loc = state[0][ship]['location']
         ac_list = []
         if (ship_loc[0] + 1) <= n and self.map[ship_loc[0] + 1][ship_loc[1]] != 'I':
             ac_list.append(('sail', ship, (ship_loc[0] + 1, ship_loc[1])))
@@ -137,7 +137,7 @@ class OptimalPirateAgent:
             yield action_combination
 
     def apply_action_sail(self, state, ac, reward):
-        state[0][ac[1]]['position'] = ac[2]  # update pirate loc
+        state[0][ac[1]]['location'] = ac[2]  # update pirate loc
         for marine in state[1]:
             index = state[1][marine]['index']
             print(index)
@@ -154,7 +154,7 @@ class OptimalPirateAgent:
         for marine in state[1]:
             index = state[1][marine]['index']
             loc = state[1][marine]['path'][index]
-            loc_pirate = state[0][ac[1]]['position']
+            loc_pirate = state[0][ac[1]]['location']
             if loc_pirate == loc:
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
@@ -162,7 +162,7 @@ class OptimalPirateAgent:
         return reward
 
     def apply_action_deposit(self, state, ac, reward):
-        num_tre = len(state[0][ac[1]]['treasure_set'])
+        num_tre = self.initial_state[0][ac[1]]['capacity'] - state[0][ac[1]]['capacity']
         reward += 4 * num_tre
         state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
         return reward
@@ -171,7 +171,7 @@ class OptimalPirateAgent:
         for marine in state[1]:
             index = state[1][marine]['index']
             loc = state[1][marine]['path'][index]
-            loc_pirate = state[0][ac[1]]['position']
+            loc_pirate = state[0][ac[1]]['location']
             if loc_pirate == loc:
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
@@ -220,56 +220,63 @@ class OptimalPirateAgent:
             possible_next_states.append(d)
         return possible_next_states
 
-    def generate_states(self, initial_state):
-        # Extract initial states for different entities
-        pirate_ships, marine_ships, treasures = initial_state
+    # def generate_states(self, initial_state):
+    #     pirate_ships_initial, marine_ships_initial, treasures_initial = initial_state
+    #
+    #     # Get all possible 'S' and 'B' locations for pirate ships on the map
+    #     sea_locations = [(i, j) for i, row in enumerate(self.map) for j, cell in enumerate(row) if cell in ['S', 'B']]
+    #
+    #     # Pirate ships: Generate all possible locations and capacities
+    #     pirate_ships_states = {
+    #         name: [(loc, ship['capacity']) for loc in sea_locations]
+    #         for name, ship in pirate_ships_initial.items()
+    #     }
+    #
+    #     # Marine ships: Generate all possible indices (positions along their path)
+    #     marine_ships_states = {
+    #         name: [{'index': i, 'path': ship['path']} for i in range(len(ship['path']))]
+    #         for name, ship in marine_ships_initial.items()
+    #     }
+    #
+    #     # Treasures: Consider all possible locations for each treasure
+    #     treasure_states = {
+    #         name: [{'location': loc, 'possible_locations': treasure['possible_locations'],
+    #                 'prob_change_location': treasure['prob_change_location']}
+    #                for loc in treasure['possible_locations']]
+    #         for name, treasure in treasures_initial.items()
+    #     }
+    #
+    #     # Generate all combinations of states
+    #     all_states = []
+    #     for pirate_combinations in itertools.product(*[pirate_ships_states[name] for name in pirate_ships_initial]):
+    #         for treasure_combinations in itertools.product(*[treasure_states[name] for name in treasures_initial]):
+    #             for marine_combinations in itertools.product(
+    #                     *[marine_ships_states[name] for name in marine_ships_initial]):
+    #                 # Combine current state configurations
+    #                 combined_state = {
+    #                     'pirate_ships': dict(zip(pirate_ships_initial.keys(), pirate_combinations)),
+    #                     'treasures': dict(zip(treasures_initial.keys(), treasure_combinations)),
+    #                     'marine_ships': dict(zip(marine_ships_initial.keys(), marine_combinations)),
+    #                 }
+    #                 all_states.append(combined_state)
+    #
+    #     return all_states
 
-        # Get all possible 'S' and 'B' locations for pirate ships
-        sea_locations = [(i, j) for i, row in enumerate(self.map) for j, cell in enumerate(row) if cell in ['S', 'B']]
-
-        # Generate all possible locations and capacities for each pirate ship
-        pirate_ships_locations = {
-            name: [(loc, capacity) for loc in sea_locations for capacity in
-                   range(ship['capacity'] + 1)]
-            for name, ship in pirate_ships.items()
-        }
-
-        # Generate all possible states for treasures
-        treasure_states = {name: treasure['possible_locations'] for name, treasure in treasures.items()}
-
-        # Generate all possible states for marine ships
-        marine_ships_states = {(name, idx) for name, ship in marine_ships.items() for idx in range(len(ship['path']))}
-
-        # Generate all combinations of states
-        all_states = []
-        for pirate_combinations in itertools.product(*[pirate_ships_locations[name] for name in pirate_ships]):
-            for treasure_combinations in itertools.product(*[treasure_states[name] for name in treasures]):
-                for marine_combinations in itertools.product(*[marine_ships_states[name] for name in marine_ships]):
-                    # Combine current state configurations
-                    combined_state = {
-                        'pirate_ships': dict(zip(pirate_ships.keys(), pirate_combinations)),
-                        'treasures': dict(zip(treasures.keys(), treasure_combinations)),
-                        'marine_ships': dict(zip(marine_ships.keys(), marine_combinations)),
-                    }
-                    all_states.append(combined_state)
-
-        return all_states
-
-    def all_states(self, initial_state):
-        states = self.generate_states(initial_state)
-        all_states = []
-        for s in states:
-            new_state = copy.deepcopy(initial_state)
-            for ship in new_state[0]:
-                new_state[0][ship]['position'] = s['pirate_ships'][ship][0]
-                new_state[0][ship]['capacity'] = s['pirate_ships'][ship][1]
-            for treasure in new_state[2]:
-                new_state[2][treasure]['location'] = s['treasures'][treasure]
-            for marine in new_state[1]:
-                new_state[1][marine]['index'] = s['marine_ships'][marine][0]
-
-            all_states.append(new_state)
-        return all_states
+    # def all_states(self, initial_state):
+    #     states = self.generate_states(initial_state)
+    #     all_states = []
+    #     for s in states:
+    #         new_state = copy.deepcopy(initial_state)
+    #         for ship in new_state[0]:
+    #             new_state[0][ship]['location'] = s['pirate_ships'][ship][0]
+    #             new_state[0][ship]['capacity'] = s['pirate_ships'][ship][1]
+    #         for treasure in new_state[2]:
+    #             new_state[2][treasure]['location'] = s['treasures'][treasure]
+    #         for marine in new_state[1]:
+    #             new_state[1][marine]['index'] = s['marine_ships'][marine]
+    #
+    #         all_states.append(new_state)
+    #     return all_states
 
     # def all_states(self, initial_state):
     #     states = self.generate_states(initial_state)
@@ -295,7 +302,7 @@ class OptimalPirateAgent:
         # Convert pirate_ships dictionary to a tuple of tuples
         pirate_ships_tuple = tuple(
             (name,
-             ('position', info['position']),
+             ('location', info['location']),
              ('capacity', info['capacity']),
              ) for name, info in pirate_ships.items()
         )
@@ -325,9 +332,9 @@ class OptimalPirateAgent:
 
         pirate_ships_dict = {
             name: {
-                'position': position,
+                'location': location,
                 'capacity': capacity,
-            } for name, (_, position), (_, capacity) in pirate_ships_tuple
+            } for name, (_, location), (_, capacity) in pirate_ships_tuple
         }
 
         marine_ships_dict = {
@@ -348,8 +355,7 @@ class OptimalPirateAgent:
         return (pirate_ships_dict, marine_ships_dict, treasures_dict)
 
     def VI(self):
-        S = self.all_states(self.initial_state)  # list of all states as dictionaries
-        len(S)
+        S = self.generate_all_states__(self.initial_state)  # list of all states as dictionaries
         s_a_prob = {}
         max_iter = self.turns_to_go  # Maximum number of iterations
         S = [s for s in S]
@@ -381,27 +387,82 @@ class OptimalPirateAgent:
                 self.Q[(self.state_to_tuple(s), i)] = best_a
             self.V = newV
 
+    def get_adjacent_positions(self, position):
+        row, col = position
+        n = len(self.map) - 1
+        m = len(self.map[0]) - 1
+
+        # Define possible movements: stay, left, right, up, down
+        movements = [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        # Generate all possible positions
+        possible_positions = [(row + dr, col + dc) for dr, dc in movements]
+
+        # Filter positions that are within the map boundaries and not on an island
+        valid_positions = [(r, c) for r, c in possible_positions if
+                           0 <= r <= n and 0 <= c <= m and self.map[r][c] != 'I']
+
+        return valid_positions
+
+    def generate_all_states__(self, state):
+        pirate_ships, marine_ships, treasures = state
+
+        # Generate all possible states for pirate ships
+        pirate_ships_states = []
+        for name, info in pirate_ships.items():
+            possible_positions = [(i, j) for i, row in enumerate(self.map) for j, cell in enumerate(row) if
+                                  cell in ['S', 'B']]
+            possible_capacities = range(0, info['capacity'] + 1)
+            for pos in possible_positions:
+                for cap in possible_capacities:
+                    pirate_ships_states.append((name, {'location': pos, 'capacity': cap}))
+
+        # Generate all possible states for marine ships
+        marine_ships_states = []
+        for name, info in marine_ships.items():
+            possible_indices = range(len(info['path']))
+            for index in possible_indices:
+                marine_ships_states.append((name, {'index': index, 'path': info['path']}))
+
+        # Generate all possible states for treasures
+        treasures_states = []
+        for name, info in treasures.items():
+            for location in info['possible_locations']:
+                treasures_states.append((name, {'location': location, 'possible_locations': info['possible_locations'],
+                                                'prob_change_location': info['prob_change_location']}))
+
+        # Combine all possibilities to generate all possible states
+        all_states = []
+        for pirate_ship_state in pirate_ships_states:
+            for marine_ship_state in marine_ships_states:
+                for treasure_state in treasures_states:
+                    all_states.append(({
+                                           pirate_ship_state[0]: pirate_ship_state[1]
+                                       }, {
+                                           marine_ship_state[0]: marine_ship_state[1]
+                                       }, {
+                                           treasure_state[0]: treasure_state[1]
+                                       }))
+
+        return all_states
+
     def act(self, state):
-        if state == self.initial:
-            # Initialize pirate ships with your new structure
-            pirate_ships_state = {}
-            for ship_name, ship_info in state['pirate_ships'].items():
-                # Here, we create a new structure for each pirate ship
-                pirate_ships_state[ship_name] = {
-                    'position': ship_info['location'],  # 'position' now directly holds the location
-                    'capacity': ship_info['capacity'],
-                    'treasure_set': set(),
-                    # 'points': 0  # Assuming initial points are 0
-                }
-            # Initialize the initial_state tuple
-            s = (pirate_ships_state,)
-            marine_ships_state = {}
-            for ship_name, ship_info in state['marine_ships'].items():
-                marine_ships_state[ship_name] = ship_info
-            s += (marine_ships_state,)
-            s += (state['treasures'],)
-        else:
-            s = state
+        # Initialize pirate ships with your new structure
+        pirate_ships_state = {}
+        for ship_name, ship_info in state['pirate_ships'].items():
+            # Here, we create a new structure for each pirate ship
+            pirate_ships_state[ship_name] = {
+                'location': ship_info['location'],  # 'position' now directly holds the location
+                'capacity': ship_info['capacity'],
+            }
+        # Initialize the initial_state tuple
+        s = (pirate_ships_state,)
+        marine_ships_state = {}
+        for ship_name, ship_info in state['marine_ships'].items():
+            marine_ships_state[ship_name] = ship_info
+        s += (marine_ships_state,)
+        s += (state['treasures'],)
+
         a = self.Q[(self.state_to_tuple(s), state['turns to go'])]
         # print(self.V[self.create_tuple_state(self.initial)])
         return a

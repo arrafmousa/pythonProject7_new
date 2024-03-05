@@ -146,7 +146,7 @@ class OptimalPirateAgent:
                 state[0][ac[1]]['treasure_set'] = set()
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
-                return reward
+        return reward
 
     def apply_action_collect(self, state, ac, reward):
         if ac[0] == "collect_treasure":
@@ -186,8 +186,6 @@ class OptimalPirateAgent:
     def all_possible_next_states(self, state, action):
 
         RESET_PENALTY = 2
-        ENCOUNTERING_MARINE_PENALTY = 1
-        DEPOSITE_REWARD = 4
 
         possible_next_states = []
         possible = self.poss_states(state)
@@ -197,14 +195,6 @@ class OptimalPirateAgent:
             new_state = copy.deepcopy(state)
             prob_state = 1
             reward = 0
-            for marine in new_state[1]:
-                new_state[1][marine]['index'] = list_possible[index_p][i][marine][0]
-                prob_state *= list_possible[index_p][i][marine][1]
-                i += 1
-            for treasure in new_state[2]:
-                new_state[2][treasure]['location'] = list_possible[index_p][i][treasure][0]
-                prob_state *= list_possible[index_p][i][treasure][1]
-                i += 1
             for ac in action:
                 if ac == "reset":
                     state = self.initial_state
@@ -222,10 +212,53 @@ class OptimalPirateAgent:
                 if ac[0] == 'wait':
                     reward = self.apply_action_wait(new_state, ac, reward)
 
+            for marine in new_state[1]:
+                new_state[1][marine]['index'] = list_possible[index_p][i][marine][0]
+                prob_state *= list_possible[index_p][i][marine][1]
+                i += 1
+            for treasure in new_state[2]:
+                new_state[2][treasure]['location'] = list_possible[index_p][i][treasure][0]
+                prob_state *= list_possible[index_p][i][treasure][1]
+                i += 1
+
             # self.turns_to_go -= 1
             d = {'state': new_state, 'prob': prob_state, 'reward': reward}
             possible_next_states.append(d)
         return possible_next_states
+
+    # def all_possible_next_states(self, state, action):
+    #     new_states = []
+    #     pirate_ships, marine_ships, treasures = state
+    #     reward = 0
+    #
+    #     # Apply action to pirate ship
+    #     if action[0] == 'sail':
+    #         pirate_ships[action[1]]['location'] = action[2]
+    #     elif action[0] == 'collect_treasure':
+    #         pirate_ships[action[1]]['capacity'] -= 1
+    #     elif action[0] == 'deposit_treasures':
+    #         reward += 4 * (self.initial_state[0][action[1]]['capacity'] - pirate_ships[action[1]]['capacity'])
+    #         pirate_ships[action[1]]['capacity'] = self.initial_state[0][action[1]]['capacity']
+    #
+    #     # Calculate possible next states for each marine
+    #     for marine, info in marine_ships.items():
+    #         possible_indices = [info['index'] - 1, info['index'], info['index'] + 1]
+    #         for index in possible_indices:
+    #             if 0 <= index < len(info['path']):
+    #                 new_state = (pirate_ships.copy(), marine_ships.copy(), treasures.copy())
+    #                 new_state[1][marine]['index'] = index
+    #                 reward = -1 if new_state[0][action[1]]['location'] == info['path'][index] else 0
+    #                 new_states.append({'state': new_state, 'prob': 1 / 3, 'reward': reward})
+    #
+    #     # Calculate possible next states for each treasure
+    #     for treasure, info in treasures.items():
+    #         for location in info['possible_locations']:
+    #             new_state = (pirate_ships.copy(), marine_ships.copy(), treasures.copy())
+    #             new_state[2][treasure]['location'] = location
+    #             prob = 0.1 if location != info['location'] else 0.9
+    #             new_states.append({'state': new_state, 'prob': prob, 'reward': 0})
+    #
+    #     return new_states
 
     def generate_states(self, initial_state):
         # Extract initial states for different entities
