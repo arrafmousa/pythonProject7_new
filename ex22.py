@@ -52,20 +52,20 @@ class OptimalPirateAgent:
                 tres_pos = tres_value['location']
                 if (ship_loc[0] + 1) <= n:
                     if (ship_loc[0] + 1, ship_loc[1]) == tres_pos:
-                        ac_list.append(('collect_treasure', ship, tres))
+                        ac_list.append(('collect', ship, tres))
                 if (ship_loc[1] + 1) <= m:
                     if (ship_loc[0], ship_loc[1] + 1) == tres_pos:
-                        ac_list.append(('collect_treasure', ship, tres))
+                        ac_list.append(('collect', ship, tres))
                 if (ship_loc[0] - 1) >= 0:
                     if (ship_loc[0] - 1, ship_loc[1]) == tres_pos:
-                        ac_list.append(('collect_treasure', ship, tres))
+                        ac_list.append(('collect', ship, tres))
                 if (ship_loc[1] - 1) >= 0:
                     if (ship_loc[0], ship_loc[1] - 1) == tres_pos:
-                        ac_list.append(('collect_treasure', ship, tres))
+                        ac_list.append(('collect', ship, tres))
 
         if state[0][ship]['capacity'] < self.initial_state[0][ship]['capacity']:
             if ship_loc == self.base:
-                ac_list.append(('deposit_treasures', ship))
+                ac_list.append(('deposit', ship))
 
         ac_list.append(('wait', ship))
         ac_list.append('reset')
@@ -140,13 +140,10 @@ class OptimalPirateAgent:
         state[0][ac[1]]['location'] = ac[2]  # update pirate loc
         for marine in state[1]:
             index = state[1][marine]['index']
-            print(index)
-            print(state[1][marine]['path'])
             loc = state[1][marine]['path'][index]
             if ac[2] == loc:
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
-                return reward
         return reward
 
     def apply_action_collect(self, state, ac, reward):
@@ -158,7 +155,6 @@ class OptimalPirateAgent:
             if loc_pirate == loc:
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
-                return reward
         return reward
 
     def apply_action_deposit(self, state, ac, reward):
@@ -175,48 +171,45 @@ class OptimalPirateAgent:
             if loc_pirate == loc:
                 state[0][ac[1]]['capacity'] = self.initial_state[0][ac[1]]['capacity']
                 reward -= 1
-                return reward
         return reward
 
     def all_possible_next_states(self, state, action):
 
         RESET_PENALTY = 2
-
+        reward = 0
         possible_next_states = []
-        possible = self.poss_states_marines_treasures(state)
+        new_state = copy.deepcopy(state)
+        for ac in action:
+            if ac == "reset":
+                return [{'state': self.initial_state, 'prob': 1, 'reward': -RESET_PENALTY}]
+            if ac == 'terminate':
+                self.turns_to_go = 0
+                return [{'state': self.initial_state, 'prob': 1, 'reward': -RESET_PENALTY}]
+            if ac[0] == 'sail':
+                reward = self.apply_action_sail(new_state, ac, reward)
+            if ac[0] == "collect":
+                reward = self.apply_action_collect(new_state, ac, reward)
+            if ac[0] == "deposit":
+                reward = self.apply_action_deposit(new_state, ac, reward)
+            if ac[0] == 'wait':
+                reward = self.apply_action_wait(new_state, ac, reward)
+
+        possible = self.poss_states_marines_treasures(new_state)
         list_possible = list(possible)  # list of possible combinations of marin treasure locations
         for index_p, p in enumerate(list_possible):
             i = 0
-            new_state = copy.deepcopy(state)
+            poss_state = copy.deepcopy(new_state)
             prob_state = 1
-            reward = 0
-            for marine in new_state[1]:
-                new_state[1][marine]['index'] = p[i][marine][0]
+            for marine in poss_state[1]:
+                poss_state[1][marine]['index'] = p[i][marine][0]
                 prob_state *= p[i][marine][1]
                 i += 1
-            for treasure in new_state[2]:
-                new_state[2][treasure]['location'] = p[i][treasure][0]
+            for treasure in poss_state[2]:
+                poss_state[2][treasure]['location'] = p[i][treasure][0]
                 prob_state *= p[i][treasure][1]
                 i += 1
 
-            for ac in action:
-                if ac == "reset":
-                    state = self.initial_state
-                    return [{'state': state, 'prob': 1, 'reward': -RESET_PENALTY}]
-                if ac == 'terminate':
-                    self.turns_to_go = 0
-                    return [{'state': state, 'prob': 1, 'reward': -RESET_PENALTY}]
-
-                if ac[0] == 'sail':
-                    reward = self.apply_action_sail(new_state, ac, reward)
-                if ac[0] == "collect_treasure":
-                    reward = self.apply_action_collect(new_state, ac, reward)
-                if ac[0] == "deposit_treasures":
-                    reward = self.apply_action_deposit(new_state, ac, reward)
-                if ac[0] == 'wait':
-                    reward = self.apply_action_wait(new_state, ac, reward)
-
-            d = {'state': new_state, 'prob': prob_state, 'reward': reward}
+            d = {'state': poss_state, 'prob': prob_state, 'reward': reward}
             possible_next_states.append(d)
         return possible_next_states
 
@@ -353,40 +346,6 @@ class OptimalPirateAgent:
         }
 
         return (pirate_ships_dict, marine_ships_dict, treasures_dict)
-
-    def VI(self):
-        S = self.generate_all_states__(self.initial_state)  # list of all states as dictionaries
-        s_a_prob = {}
-        max_iter = self.turns_to_go  # Maximum number of iterations
-        S = [s for s in S]
-        self.V = {self.state_to_tuple(s): 0 for s in S}
-        self.Q = {(self.state_to_tuple(s), i): 0 for s in S for i in
-                  range(max_iter + 1)}  # key=(state,turns to go) ,value=(value of VI,best action)
-        for i in range(max_iter + 1):
-            newV = {self.state_to_tuple(s): 0 for s in S}
-            for s in S:
-                s_dict = s
-                max_val = float('-inf')
-                A = self.actions(s_dict)  # all actions that can be performed is state
-                best_a = 0
-                for j, a in enumerate(A):
-                    s_a_prob[(self.state_to_tuple(s), a)] = self.all_possible_next_states(s, a)  # this function returns
-                    # list of dictionaries that have the form:
-                    # {'state': the next state(one of them),
-                    #  'prob': probability of getting 'state' value,
-                    #  'reward':score(reward from s_dict and a or 'state reward')}
-                    val = s_a_prob[(self.state_to_tuple(s), a)][0]['reward']
-
-                    for state_prob_r in s_a_prob[(self.state_to_tuple(s), a)]:
-                        val += state_prob_r['prob'] * self.V[self.state_to_tuple(state_prob_r['state'])]
-
-                    if max_val < val:
-                        max_val = val
-                        best_a = a
-                newV[self.state_to_tuple(s)] = max_val
-                self.Q[(self.state_to_tuple(s), i)] = best_a
-            self.V = newV
-
     def get_adjacent_positions(self, position):
         row, col = position
         n = len(self.map) - 1
@@ -445,6 +404,39 @@ class OptimalPirateAgent:
                                        }))
 
         return all_states
+
+    def VI(self):
+        S = self.generate_all_states__(self.initial_state)  # list of all states as dictionaries
+        s_a_prob = {}
+        max_iter = self.turns_to_go  # Maximum number of iterations
+        S = [s for s in S]
+        self.V = {self.state_to_tuple(s): 0 for s in S}
+        self.Q = {(self.state_to_tuple(s), i): 0 for s in S for i in
+                  range(max_iter + 1)}  # key=(state,turns to go) ,value=(value of VI,best action)
+        for i in range(max_iter + 1):
+            newV = {self.state_to_tuple(s): 0 for s in S}
+            for s in S:
+                s_dict = s
+                max_val = float('-inf')
+                A = self.actions(s_dict)  # all actions that can be performed is state
+                best_a = 0
+                for j, a in enumerate(A):
+                    s_a_prob[(self.state_to_tuple(s), a)] = self.all_possible_next_states(s, a)  # this function returns
+                    # list of dictionaries that have the form:
+                    # {'state': the next state(one of them),
+                    #  'prob': probability of getting 'state' value,
+                    #  'reward':score(reward from s_dict and a or 'state reward')}
+                    val = s_a_prob[(self.state_to_tuple(s), a)][0]['reward']
+
+                    for state_prob_r in s_a_prob[(self.state_to_tuple(s), a)]:
+                        val += state_prob_r['prob'] * self.V[self.state_to_tuple(state_prob_r['state'])]
+
+                    if max_val < val:
+                        max_val = val
+                        best_a = a
+                newV[self.state_to_tuple(s)] = max_val
+                self.Q[(self.state_to_tuple(s), i)] = best_a
+            self.V = newV
 
     def act(self, state):
         # Initialize pirate ships with your new structure
